@@ -1,11 +1,13 @@
-<?php namespace Eld\Bridgevb\Facades;
+<?php
+
+namespace Rixot\Illuminate\VBAuth\Facades;
 
 use Illuminate\Support\Facades\Facade;
 
-class BridgeVb extends Facade
+class VBAuth extends Facade
 {
     protected static function getFacadeAccessor()
     {
-        return 'bridgevb';
+        return 'vbauth';
     }
 }
