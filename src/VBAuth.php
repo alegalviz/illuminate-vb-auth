@@ -3,18 +3,31 @@
 namespace Rixot\Illuminate\VBAuth;
 
 use Illuminate\Container\Container;
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cookie;
-use Illuminate\Support\Facades\DB;
+use Illuminate\Http\Request;
 
 class VBAuth
 {
     /**
-     * The connection string
+     * Current request object.
+     *
+     * @var Request
+     */
+    protected $request;
+
+    /**
+     * Database connection interface
+     *
+     * @var DB
+     */
+    protected $database;
+
+    /**
+     * The string containing the database tables prefix
      *
      * @var string
      */
-    protected $connection;
+    protected $tablePrefix;
 
     /**
      * The cookie hash unique to the vBulletin forum
@@ -36,13 +49,6 @@ class VBAuth
      * @var integer
      */
     protected $cookieTimeout;
-
-    /**
-     * The string containing the database tables prefixes
-     *
-     * @var string
-     */
-    protected $databasePrefix;
 
     /**
      * The default user in case of no authentication
@@ -94,11 +100,12 @@ class VBAuth
      */
     public function __construct(array $config)
     {
-        $this->databaseConnection = $config['db']['connection'];
-        $this->databasePrefix = $config['db']['prefix'];
+        $this->request = app()->make('request');
+        $this->database = app()->make('db');
+        $this->tablePrefix = $config['db']['table_prefix'];
         $this->cookieHash = $config['cookie']['hash'];
         $this->cookiePrefix = $config['cookie']['prefix'];
-        $this->cookieTimeout = $this->table('setting')->where('varname', 'cookietimeout')->first()->value;
+        $this->cookieTimeout = $this->query('setting')->where('varname', 'cookietimeout')->first()->value;
         $this->forumPath = $config['forum_path'];
         $this->userColumns = $config['user_columns'];
         $this->userGroups = $config['user_groups'];
@@ -212,10 +219,9 @@ class VBAuth
      * Attempts to authenticate the user based on cookies and sessions in the
      * database
      *
-     * @param  Request  $request
      * @return boolean
      */
-    protected function authenticateSession(Request $request)
+    protected function authenticateSession()
     {
         $userid = !empty($this->cookie('userid')) ? $this->cookie('userid') : false;
         $password = !empty($this->cookie('password')) ? $this->cookie('password') : false;
@@ -235,14 +241,13 @@ class VBAuth
                 return false;
             }
         } elseif ($sessionHash) {
-
             $session = $this->query('session')
                 ->where('sessionhash', $sessionHash)
                 ->where('idhash', $this->fetchIdHash())
                 ->first();
 
             if ($session) {
-                if ($session && ($session->host == $request->server('REMOTE_ADDR'))) {
+                if ($session && ($session->host == $this->request->server('REMOTE_ADDR'))) {
                     $userinfo = $this->query('user')
                         ->where('userid', $session->userid)
                         ->first($this->userColumns);
@@ -275,13 +280,9 @@ class VBAuth
      */
     protected function isValidCookieUser($userid, $password)
     {
-        $dbPass = $this->query('user')->where('userid', $userid)->first(['password']);
+        $dbPass = $this->query('user')->where('userid', $userid)->first(['password'])->password;
 
-        if ($dbPass) {
-            $dbPass = $dbPass[0];
-        }
-
-        if ($password == md5($dbPass->password . $this->cookieHash)) {
+        if ($password == md5($dbPass . $this->cookieHash)) {
             return intval($userid);
         }
 
@@ -326,12 +327,11 @@ class VBAuth
      *
      * @param  string  $userid
      * @param  boolean  $remember
-     * @param  Request  $request
      * @return boolean
      */
-    protected function createSession($userid, $remember = true, Request $reqest)
+    protected function createSession($userid, $remember = true)
     {
-        $hash = md5(microtime() . $userid . $request->server('REMOTE_ADDR'));
+        $hash = md5(microtime() . $userid . $this->request->server('REMOTE_ADDR'));
 
         $timeout = time() + $this->cookieTimeout;
 
@@ -344,17 +344,17 @@ class VBAuth
         $session = array (
             'userid'        => $userid,
             'sessionhash'   => $hash,
-            'host'          => $request->server('REMOTE_ADDR'),
+            'host'          => $this->request->server('REMOTE_ADDR'),
             'idhash'        => $this->fetchIdHash(),
             'lastactivity'  => time(),
-            'location'      => $request->server('REQUEST_URI'),
-            'useragent'     => substr($request->server('HTTP_USER_AGENT'), 0, 100),
+            'location'      => $this->request->server('REQUEST_URI'),
+            'useragent'     => substr($this->request->server('HTTP_USER_AGENT'), 0, 100),
             'loggedin'      => 1,
         );
 
         $this->query('session')
-            ->where('host', $request->server('REMOTE_ADDR'))
-            ->where('useragent', substr($request->server('HTTP_USER_AGENT'), 0, 100))
+            ->where('host', $this->request->server('REMOTE_ADDR'))
+            ->where('useragent', substr($this->request->server('HTTP_USER_AGENT'), 0, 100))
             ->delete();
 
         $this->query('session')->insert($session);
@@ -366,10 +366,9 @@ class VBAuth
      * Updates or creates a new session based on existing rows in the database
      *
      * @param  string  $userid
-     * @param  Request  $request
      * @return boolean
      */
-    protected function updateOrCreateSession($userid, Request $request)
+    protected function updateOrCreateSession($userid)
     {
         $sessionHash = !empty($this->cookie('sessionhash')) ? $this->cookie('sessionhash') : '';
 
@@ -384,32 +383,32 @@ class VBAuth
 
                 $updatedSession = [
                     'userid' => $userid,
-                    'host' => $request->server('REMOTE_ADDR'),
+                    'host' => $this->request->server('REMOTE_ADDR'),
                     'lastactivity' => time(),
-                    'location' => $request->server('REQUEST_URI'),
+                    'location' => $this->request->server('REQUEST_URI'),
                 ];
 
                 $this->query('session')
                     ->where('userid', $userid)
-                    ->where('useragent', substr($request->server('HTTP_USER_AGENT'), 0, 100))
-                    ->where('sessionhash',$_COOKIE[$this->cookiePrefix . 'sessionhash'])
+                    ->where('useragent', substr($this->request->server('HTTP_USER_AGENT'), 0, 100))
+                    ->where('sessionhash', $this->cookie('sessionhash'))
                     ->update($updatedSession);
 
                 return $activityAndHash->sessionhash;
             } else {
                 var_dump('refreshing session');
-                $newSessionHash = md5(microtime() . $userid . $request->server('REMOTE_ADDR'));
+                $newSessionHash = md5(microtime() . $userid . $this->request->server('REMOTE_ADDR'));
                 $timeout = time() + $this->cookieTimeout;
                 $this->cookie('sessionhash', $newSessionHash, $timeout);
 
                 $newSession = [
                     'userid'        => $userid,
                     'sessionhash'   => $newSessionHash,
-                    'host'          => $request->server('REMOTE_ADDR'),
+                    'host'          => $this->request->server('REMOTE_ADDR'),
                     'idhash'        => $this->fetchIdHash(),
                     'lastactivity'  => time(),
-                    'location'      => $request->server('REQUEST_URI'),
-                    'useragent'     => substr($request->server('HTTP_USER_AGENT'), 0, 100),
+                    'location'      => $this->request->server('REQUEST_URI'),
+                    'useragent'     => substr($this->request->server('HTTP_USER_AGENT'), 0, 100),
                     'loggedin'      => 1,
                 ];
 
@@ -428,7 +427,7 @@ class VBAuth
      *
      * @return void
      */
-    protected function deleteSession(Request $request)
+    protected function deleteSession()
     {
         $sessionHash = $this->cookie('sessionhash');
         $this->cookie('sessionhash', '', time() - 3600);
@@ -437,18 +436,18 @@ class VBAuth
 
         $this->query('session')
             ->where('userid', $this->userInfo->userid)
-            ->where('useragent', substr($request->server('HTTP_USER_AGENT'), 0, 100))
+            ->where('useragent', substr($this->request->server('HTTP_USER_AGENT'), 0, 100))
             ->delete();
 
-        $hash = md5(microtime() . 0 . $request->server('REMOTE_ADDR'));
+        $hash = md5(microtime() . 0 . $this->request->server('REMOTE_ADDR'));
         $anonymousSession = [
             'userid'        => 0,
             'sessionhash'   => $hash,
-            'host'          => $request->server('REMOTE_ADDR'),
+            'host'          => $this->request->server('REMOTE_ADDR'),
             'idhash'        => $this->fetchIdHash(),
             'lastactivity'  => time(),
-            'location'      => $request->server('REQUEST_URI'),
-            'useragent'     => substr($request->server('HTTP_USER_AGENT'), 0, 100),
+            'location'      => $this->request->server('REQUEST_URI'),
+            'useragent'     => substr($this->request->server('HTTP_USER_AGENT'), 0, 100),
             'loggedin'      => 0,
         ];
 
@@ -461,20 +460,19 @@ class VBAuth
      * @param  Request  $request
      * @return string The unique ID hash to each client
      */
-    protected function fetchIdHash(Request $request)
+    protected function fetchIdHash()
     {
-        return md5($request->server('HTTP_USER_AGENT') . $this->fetchIp());
+        return md5($this->request->server('HTTP_USER_AGENT') . $this->fetchIp());
     }
 
     /**
      * Fetches the shortened IP used in hashing
      *
-     * @param  Request  $request
      * @return string
      */
-    protected function fetchIp(Request $request)
+    protected function fetchIp()
     {
-        $ip = $request->server('REMOTE_ADDR');
+        $ip = $this->request->server('REMOTE_ADDR');
         return implode('.', array_slice(explode('.', $ip), 0, 4 -1));
     }
 
@@ -498,8 +496,7 @@ class VBAuth
      */
     protected function query($table)
     {
-        return DB::connection($this->databaseConnection)
-            ->table($this->databasePrefix . $table);
+        return $this->database->table($this->tablePrefix . $table);
     }
 
     /**
@@ -520,6 +517,8 @@ class VBAuth
             return setcookie($this->cookiePrefix . $key, $value, $expires);
         }
 
-        return $_COOKIE[$this->cookiePrefix . $key];
+        $cookie = $this->cookiePrefix . $key;
+
+        return (isset($_COOKIE[$cookie])) ? $_COOKIE[$cookie] : null;
     }
 }

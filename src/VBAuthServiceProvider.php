@@ -13,7 +13,7 @@ class VBAuthServiceProvider extends ServiceProvider
      */
     public function register()
     {
-        $this->app->singleton('Rixot\Lumen\VBAuth\VBAuth', function ($app) {
+        $this->app->singleton('Rixot\Illuminate\VBAuth\VBAuth', function ($app) {
             return new VBAuth(config('vbauth'));
         });
     }
@@ -21,16 +21,18 @@ class VBAuthServiceProvider extends ServiceProvider
     /**
      * Bootstrap the application events.
      *
-     * @param  Router  $router
      * @return void
      */
-    public function boot(Router $router)
+    public function boot()
     {
         $dir = __DIR__.'/../';
 
-        $this->publishes([
-            "{$dir}config/vbauth.php" => config_path('vbauth.php')
-        ], 'config');
+        // Make config publishable if the application has a config path
+        if (file_exists($this->app->basePath('config'))) {
+            $this->publishes([
+                "{$dir}config/vbauth.php" => $this->app->basePath('config') . '/vbauth.php'
+            ], 'config');
+        }
 
         $this->mergeConfigFrom("{$dir}config/vbauth.php", 'vbauth');
     }

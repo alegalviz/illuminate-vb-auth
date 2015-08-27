@@ -3,10 +3,10 @@
 return [
     'db' => [
         'connection'    => 'mysql',
-        'prefix'        => 'vb_'
+        'table_prefix'  => ''
     ],
     'cookie' => [
-        'hash'      => 'AdflkjEr90234asdlkj1349SDFkl',
+        'hash'      => 'Va1WGqRMAtkRTuuzBOcPM43HDTWB',
         'prefix'    => 'bb_'
     ],
     'forum_path'    => 'http://example.com/',
