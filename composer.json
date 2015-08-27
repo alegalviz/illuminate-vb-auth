@@ -1,5 +1,5 @@
 {
-    "name": "Rixot/illuminate-vb-auth",
+    "name": "rixot/illuminate-vb-auth",
     "description": "A vBulletin 4 authentication bridge for Illuminate-based applications (Laravel, Lumen).",
     "license": "MIT",
     "keywords": ["vbulletin", "vb", "illuminate", "laravel", "lumen"],
@@ -13,7 +13,7 @@
     },
     "autoload": {
         "psr-4": {
-            "Rixot\\Illuminate\\VBAuth": "src"
+            "Rixot\\Illuminate\\VBAuth\\": "src"
         }
     },
     "minimum-stability": "dev"
