@@ -412,7 +412,6 @@ class VBAuth
 
                 return $activityAndHash->sessionhash;
             } else {
-                var_dump('refreshing session');
                 $newSessionHash = md5(microtime() . $userid . $this->request->server('REMOTE_ADDR'));
                 $timeout = time() + $this->cookieTimeout;
                 $this->cookie('sessionhash', $newSessionHash, $timeout);
