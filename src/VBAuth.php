@@ -182,6 +182,22 @@ class VBAuth
     }
 
     /**
+     * Returns an array of all of the user's group IDs
+     *
+     * @return array
+     */
+    public function getUserGroupIDs()
+    {
+        $membergroupids = explode(',', $this->userInfo->membergroupids);
+
+        if (in_array($this->userInfo->usergroupid, $membergroupids)) {
+            return $membergroupids;
+        }
+
+        return [$this->userInfo->usergroupid] + $membergroupids;
+    }
+
+    /**
      * Gets the particular piece of user information passed in
      *
      * @param  string  $val
@@ -341,7 +357,7 @@ class VBAuth
             $this->cookie('sessionhash', $hash, 0);
         }
 
-        $session = array (
+        $session = [
             'userid'        => $userid,
             'sessionhash'   => $hash,
             'host'          => $this->request->server('REMOTE_ADDR'),
@@ -350,7 +366,7 @@ class VBAuth
             'location'      => $this->request->server('REQUEST_URI'),
             'useragent'     => substr($this->request->server('HTTP_USER_AGENT'), 0, 100),
             'loggedin'      => 1,
-        );
+        ];
 
         $this->query('session')
             ->where('host', $this->request->server('REMOTE_ADDR'))
