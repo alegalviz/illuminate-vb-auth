@@ -111,7 +111,7 @@ class VBAuth
         $this->userGroups = $config['user_groups'];
 
         $this->setUserInfo($this->defaultUser);
-        $this->authenticateSession();
+        $this->establishSession();
     }
 
     /**
@@ -232,12 +232,11 @@ class VBAuth
     }
 
     /**
-     * Attempts to authenticate the user based on cookies and sessions in the
-     * database
+     * Attempts to establish a session using the current cookie and DB session
      *
      * @return boolean
      */
-    protected function authenticateSession()
+    protected function establishSession()
     {
         $userid = !empty($this->cookie('userid')) ? $this->cookie('userid') : false;
         $password = !empty($this->cookie('password')) ? $this->cookie('password') : false;
@@ -246,14 +245,7 @@ class VBAuth
         if ($userid && $password) {
             $user = $this->isValidCookieUser($userid, $password);
 
-            if ($user) {
-                $sessionHash = $this->updateOrCreateSession($userid);
-                $userinfo = $this->query('user')
-                    ->where('userid', $userid)
-                    ->first($this->userColumns);
-                $this->setUserInfo($userinfo);
-                return true;
-            } else {
+            if (!$user) {
                 return false;
             }
         } elseif ($sessionHash) {
@@ -262,29 +254,27 @@ class VBAuth
                 ->where('idhash', $this->fetchIdHash())
                 ->first();
 
-            if ($session) {
-                if ($session && ($session->host == $this->request->server('REMOTE_ADDR'))) {
-                    $userinfo = $this->query('user')
-                        ->where('userid', $session->userid)
-                        ->first($this->userColumns);
-
-                    if (!$userinfo) {
-                        return false;
-                    }
-
-                    $this->setUserInfo($userinfo);
-                    $this->updateOrCreateSession($userinfo->userid);
-
-                    return true;
-                }
-            } else {
+            if (!$session || ($session->host != $this->request->server('REMOTE_ADDR'))) {
                 return false;
             }
+
+            $userid = $session->userid;
         } else {
             return false;
         }
 
-        return false;
+        $userinfo = $this->query('user')
+            ->where('userid', $userid)
+            ->first($this->userColumns);
+
+        if (!$userinfo) {
+            return false;
+        }
+
+        $this->setUserInfo($userinfo);
+        $this->updateOrCreateSession($userid);
+
+        return true;
     }
 
     /**
@@ -396,7 +386,6 @@ class VBAuth
 
         if ($activityAndHash) {
             if ((time() - $activityAndHash->lastactivity) < $this->cookieTimeout) {
-
                 $updatedSession = [
                     'userid' => $userid,
                     'host' => $this->request->server('REMOTE_ADDR'),
@@ -434,7 +423,6 @@ class VBAuth
         } else {
             return $this->createSession($userid);
         }
-
     }
 
     /**
