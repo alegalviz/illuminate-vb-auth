@@ -1,19 +1,19 @@
 {
-    "name": "rixot/illuminate-vb-auth",
+    "name": "alegalviz/illuminate-vb-auth",
     "description": "A vBulletin 4 authentication bridge for Illuminate-based applications (Laravel, Lumen).",
     "license": "MIT",
     "keywords": ["vbulletin", "vb", "illuminate", "laravel", "lumen"],
-    "homepage": "https://github.com/Rixot/lumen-vb-auth",
+    "homepage": "https://github.com/alegalviz/lumen-vb-auth",
     "require": {
         "php": ">=5.5.9",
-        "illuminate/config": "5.1.*",
-        "illuminate/cookie": "5.1.*",
-        "illuminate/database": "5.1.*",
-        "illuminate/support": "5.1.*"
+        "illuminate/config": "^5.1.*",
+        "illuminate/cookie": "^5.1.*",
+        "illuminate/database": "^5.1.*",
+        "illuminate/support": "^5.1.*"
     },
     "autoload": {
         "psr-4": {
-            "Rixot\\Illuminate\\VBAuth\\": "src"
+            "alegalviz\\Illuminate\\VBAuth\\": "src"
         }
     },
     "minimum-stability": "dev"
